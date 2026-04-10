@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📧 Email Migrator – Framarketing</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f0f1a;
+    color: #e0e0f0;
+    min-height: 100vh;
+    padding: 30px 20px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #6c63ff, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    margin-bottom: 30px;
+    font-size: 0.9rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto 20px;
+  }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: #1a1a2e;
+    border: 1px solid #2d2d50;
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .card h2 {
+    font-size: 1rem;
+    margin-bottom: 16px;
+    color: #a78bfa;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+  input[type=text], input[type=number], input[type=password] {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0f0f1a;
+    border: 1px solid #3d3d60;
+    border-radius: 8px;
+    color: #e0e0f0;
+    font-size: 0.9rem;
+    transition: border-color 0.2s;
+  }
+  input:focus { outline: none; border-color: #6c63ff; }
+  .ssl-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: #6c63ff; cursor: pointer; }
+  .btn {
+    display: block;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto 20px;
+    padding: 14px;
+    background: linear-gradient(135deg, #6c63ff, #a78bfa);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn:hover:not(:disabled) { opacity: 0.88; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #status-bar {
+    max-width: 900px;
+    margin: 0 auto 10px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #a78bfa;
+    min-height: 20px;
+  }
+  .log-box {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #0a0a14;
+    border: 1px solid #2d2d50;
+    border-radius: 12px;
+    padding: 20px;
+    height: 300px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: #c0c0e0;
+    display: none;
+  }
+  .log-box.visible { display: block; }
+  .log-line.error   { color: #ff6b6b; }
+  .log-line.success { color: #6bff8e; }
+</style>
+</head>
+<body>
+
+<h1>📧 Email Migrator</h1>
+<p class="subtitle">Migra todos tus correos de una cuenta IMAP a otra · Framarketing Tools</p>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>📤 Cuenta Origen</h2>
+    <label>Servidor IMAP</label>
+    <input type="text" id="src_host" placeholder="imap.gmail.com" />
+    <label>Puerto</label>
+    <input type="number" id="src_port" value="993" />
+    <label>Usuario (email)</label>
+    <input type="text" id="src_user" placeholder="usuario@dominio.com" />
+    <label>Contraseña</label>
+    <input type="password" id="src_pass" />
+    <div class="ssl-row">
+      <input type="checkbox" id="src_ssl" checked />
+      <label for="src_ssl" style="margin:0">Usar SSL</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📥 Cuenta Destino</h2>
+    <label>Servidor IMAP</label>
+    <input type="text" id="dst_host" placeholder="imap.tudominio.com" />
+    <label>Puerto</label>
+    <input type="number" id="dst_port" value="993" />
+    <label>Usuario (email)</label>
+    <input type="text" id="dst_user" placeholder="usuario@destino.com" />
+    <label>Contraseña</label>
+    <input type="password" id="dst_pass" />
+    <div class="ssl-row">
+      <input type="checkbox" id="dst_ssl" checked />
+      <label for="dst_ssl" style="margin:0">Usar SSL</label>
+    </div>
+  </div>
+
+</div>
+
+<div id="status-bar"></div>
+<button class="btn" id="btn-migrate" onclick="iniciarMigracion()">🚀 Iniciar Migración</button>
+<div class="log-box" id="log-box"></div>
+
+<script>
+  let eventSource = null;
+
+  function iniciarMigracion() {
+    const cfg = {
+      src_host: document.getElementById('src_host').value.trim(),
+      src_port: document.getElementById('src_port').value,
+      src_user: document.getElementById('src_user').value.trim(),
+      src_pass: document.getElementById('src_pass').value,
+      src_ssl:  document.getElementById('src_ssl').checked,
+      dst_host: document.getElementById('dst_host').value.trim(),
+      dst_port: document.getElementById('dst_port').value,
+      dst_user: document.getElementById('dst_user').value.trim(),
+      dst_pass: document.getElementById('dst_pass').value,
+      dst_ssl:  document.getElementById('dst_ssl').checked,
+    };
+
+    const required = ['src_host','src_user','src_pass','dst_host','dst_user','dst_pass'];
+    if (required.some(k => !cfg[k])) {
+      alert('⚠️ Completa todos los campos antes de continuar.');
+      return;
+    }
+
+    document.getElementById('btn-migrate').disabled = true;
+    document.getElementById('status-bar').textContent = '⏳ Iniciando migración...';
+
+    const logBox = document.getElementById('log-box');
+    logBox.innerHTML = '';
+    logBox.classList.add('visible');
+
+    // 1. Llamar al servidor para arrancar la migración
+    fetch('/migrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg)
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) {
+        appendLog('❌ ' + data.error, 'error');
+        document.getElementById('btn-migrate').disabled = false;
+        return;
+      }
+
+      // 2. Abrir SSE para recibir logs en tiempo real
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource('/stream');
+
+      eventSource.onmessage = (e) => {
+        const msg = e.data;
+
+        if (msg === '__FIN__') {
+          eventSource.close();
+          document.getElementById('btn-migrate').disabled = false;
+          document.getElementById('status-bar').textContent = '✅ Migración finalizada.';
+          return;
+        }
+
+        appendLog(msg);
+
+        // Mostrar en la barra de estado una versión limpia del mensaje
+        const limpio = msg.replace(/[\u{1F300}-\u{1FFFF}]/gu, '').trim();
+        if (limpio) document.getElementById('status-bar').textContent = limpio;
+      };
+
+      eventSource.onerror = () => {
+        appendLog('⚠️ Conexión SSE perdida.', 'error');
+      };
+    })
+    .catch(err => {
+      appendLog('❌ Error de red: ' + err.message, 'error');
+      document.getElementById('btn-migrate').disabled = false;
+    });
+  }
+
+  function appendLog(msg, cls = '') {
+    const logBox = document.getElementById('log-box');
+    const div = document.createElement('div');
+    div.className = 'log-line ' + cls;
+    div.textContent = msg;
+    logBox.appendChild(div);
+    logBox.scrollTop = logBox.scrollHeight; // auto-scroll al último log
+  }
+</script>
+</body>
+</html>
